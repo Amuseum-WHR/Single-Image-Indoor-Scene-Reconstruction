@@ -151,6 +151,7 @@ if __name__ == "__main__":
     from scipy.io import savemat
     
     # save layout
+    print(lo_bdb3D_out)
     savemat(os.path.join(save_path, 'layout.mat'),
             mdict={'layout': lo_bdb3D_out[0, :, :].cpu().numpy()})
     # save bounding boxes and camera poses

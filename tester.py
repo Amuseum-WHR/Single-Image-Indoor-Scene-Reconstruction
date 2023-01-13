@@ -360,7 +360,7 @@ class Tester():
 
 
         # lo_bdb3D_out, lo_bdb3D_out_form_cpu \
-        lo_bdb3D_out = get_layout_bdb_sunrgbd(bins_tensor, est_data['lo_ori_reg'],
+        lo_bdb3D_out, _ = get_layout_bdb_sunrgbd(bins_tensor, est_data['lo_ori_reg'],
                                             torch.argmax(est_data['lo_ori_cls'], 1),
                                             est_data['lo_centroid'],
                                             est_data['lo_coeffs'])
