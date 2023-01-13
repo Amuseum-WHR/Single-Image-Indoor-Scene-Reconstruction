@@ -12,3 +12,5 @@
 + torchvision 0.13.1
 + pytorch3d
 + tensorboard
++ chainercv
++ cupy
