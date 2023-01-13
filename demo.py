@@ -122,14 +122,13 @@ if __name__ == "__main__":
         txt_path = opt.k_path
         K = torch.FloatTensor(np.loadtxt(txt_path))
 
-    # gt_data = tester.read_from_img(K)
-    
     now_time = str(datetime.datetime.now().replace(microsecond=0)).replace(' ','_').replace(':','-')
     save_path = os.path.join(opt.demo_path, now_time)
     os.mkdir(save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    gt_data = get_random_data_from_sunrgbd(save_path)
+    gt_data = tester.read_from_img(K, save_path=save_path)
+    # gt_data = get_random_data_from_sunrgbd(save_path)
     # gt_data = tester.get_data_from_json('demo/inputs/1/img.jpg', 'demo/inputs/1/detections.json', K)
     with torch.no_grad():
         est_data, data = tester.step(gt_data)

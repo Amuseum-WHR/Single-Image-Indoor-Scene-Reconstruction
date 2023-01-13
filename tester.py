@@ -1,12 +1,12 @@
 import datetime
 import argparse
-
+import os
 import math
 import torch
 import torch.nn as nn
 import numpy as np
 from easydict import EasyDict
-# from detection import TwoDBB
+from detection import TwoDBB
 from PIL import Image
 
 from model.network import TOTAL3D
@@ -431,7 +431,7 @@ class Tester():
     #     pymesh.save_mesh_raw(file_path, total_vertice, total_face)
     #     print("mesh saving at {}".format(file_path))
     
-    def get_data_from_image(self, gpu, image_path, model_path, K, add_box=None):
+    def get_data_from_image(self, gpu, image_path, model_path, K, add_box=None, save_path=None):
         raw_data = dict()
         raw_data['camera'] = {'K': K}
         raw_data['image'] = Image.open(image_path ,mode='r')
@@ -447,13 +447,14 @@ class Tester():
             for j in range(len(boxes[i]['bbox'])):
                 boxes[i]['bbox'][j] = float(boxes[i]['bbox'][j])
             boxes[i]['class'] = float(boxes[i]['class'])
-        with open('./demo/box.json','w') as f:
+        print(save_path)
+        with open(os.path.join(save_path, 'box.json'), 'w') as f:
             f.write(json.dumps(boxes))
         return raw_data
     
-    def read_from_img(self, K):
+    def read_from_img(self, K, save_path=None):
         if self.mode != 'add':
-            raw_data = self.get_data_from_image(self.opt.cuda_num, self.opt.img_path, self.opt.detection_path, K)
+            raw_data = self.get_data_from_image(self.opt.cuda_num, self.opt.img_path, self.opt.detection_path, K, save_path=save_path)
             gt_data = self.process_raw_data(raw_data)
         else:
             add_box = TwoDBB(self.opt.cuda_num, self.opt.detection_path, self.opt.add_img)
@@ -469,7 +470,7 @@ class Tester():
             add_img = add_img.crop((add_box[idx]['bbox'][0], add_box[idx]['bbox'][1], add_box[idx]['bbox'][2], add_box[idx]['bbox'][3]))
             add_box = add_box[idx:idx+1]
             add_box[0]['bbox'] = self.opt.add_box
-            raw_data = self.get_data_from_image(self.opt.cuda_num, self.opt.img_path, self.opt.detection_path, K, add_box)
+            raw_data = self.get_data_from_image(self.opt.cuda_num, self.opt.img_path, self.opt.detection_path, K, add_box, save_path=save_path)
             gt_data = self.process_raw_data(raw_data, add_img)
         return gt_data
 
