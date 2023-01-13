@@ -129,8 +129,8 @@ if __name__ == "__main__":
     os.mkdir(save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    # gt_data = get_random_data_from_sunrgbd(save_path)
-    gt_data = tester.get_data_from_json('demo/inputs/1/img.jpg', 'demo/inputs/1/detections.json', K)
+    gt_data = get_random_data_from_sunrgbd(save_path)
+    # gt_data = tester.get_data_from_json('demo/inputs/1/img.jpg', 'demo/inputs/1/detections.json', K)
     with torch.no_grad():
         est_data, data = tester.step(gt_data)
 
