@@ -3,6 +3,7 @@ Reference: chainercv/examples/faster_rcnn/demo.py
 """
 
 import argparse
+import os
 import matplotlib.pyplot as plt
 
 import chainer
@@ -13,7 +14,7 @@ from chainercv.visualizations import vis_bbox
 from dataset.Sunrgbd_2DBB_Dataloader import NYU40CLASSES
 
 
-def TwoDBB(gpu, pretrained_model, image):
+def TwoDBB(gpu, pretrained_model, image, visualize, save):
     # load model
     model = FasterRCNNVGG16(n_fg_class=len(NYU40CLASSES), pretrained_model=pretrained_model)
     if gpu >= 0:
@@ -30,9 +31,12 @@ def TwoDBB(gpu, pretrained_model, image):
     for i in range(n_objects):
         dic.append({'bbox': bbox_xy[i], 'class': label[i]})
 
-    # visualize
     vis_bbox(img, bbox, label, score, label_names=NYU40CLASSES)
-    plt.show()
+    if visualize:
+        plt.show()
+
+    if save:
+        plt.savefig(os.path.splitext(image)[0]+'_2DBB.jpg')
 
     return dic
 
@@ -42,10 +46,12 @@ def args(description):
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--pretrained-model', default='./out/2DBB/2dbb_model_80000.npz')
     parser.add_argument('--image', default='./demo/inputs/img1.jpg')
+    parser.add_argument('--visualize', action='store_true')
+    parser.add_argument('--save', action='store_true')
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = args('2D Bounding Boxes Demo')
 
-    print(TwoDBB(args.gpu, args.pretrained_model, args.image))
+    print(TwoDBB(args.gpu, args.pretrained_model, args.image, args.visualize, args.save))
