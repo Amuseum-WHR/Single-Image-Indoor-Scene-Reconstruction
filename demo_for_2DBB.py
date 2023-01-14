@@ -14,7 +14,7 @@ from chainercv.visualizations import vis_bbox
 from dataset.Sunrgbd_2DBB_Dataloader import NYU40CLASSES
 
 
-def TwoDBB(gpu, pretrained_model, image, visualize, save):
+def TwoDBB(gpu, pretrained_model, image):
     # load model
     model = FasterRCNNVGG16(n_fg_class=len(NYU40CLASSES), pretrained_model=pretrained_model)
     if gpu >= 0:
@@ -31,12 +31,32 @@ def TwoDBB(gpu, pretrained_model, image, visualize, save):
     for i in range(n_objects):
         dic.append({'bbox': bbox_xy[i], 'class': label[i]})
 
-    if save or visualize:
-        vis_bbox(img, bbox, label, score, label_names=NYU40CLASSES)
-        if save:
-            plt.savefig(os.path.splitext(image)[0] + '_2DBB.jpg')
-        if visualize:
-            plt.show()
+    return dic
+
+
+def TwoDBB_demo(gpu, pretrained_model, image, visualize, save):
+    # load model
+    model = FasterRCNNVGG16(n_fg_class=len(NYU40CLASSES), pretrained_model=pretrained_model)
+    if gpu >= 0:
+        chainer.cuda.get_device_from_id(gpu).use()
+        model.to_gpu()
+
+    # predit
+    img = utils.read_image(image, color=True)
+    bboxes, labels, scores = model.predict([img])
+    bbox, label, score = bboxes[0], labels[0], scores[0]
+    n_objects = bbox.shape[0]
+    bbox_xy = [[int(bbox[i][1]), int(bbox[i][0]), int(bbox[i][3]), int(bbox[i][2])] for i in range(n_objects)]
+    dic = []
+    for i in range(n_objects):
+        dic.append({'bbox': bbox_xy[i], 'class': label[i]})
+
+    # visualize and save
+    vis_bbox(img, bbox, label, score, label_names=NYU40CLASSES)
+    if save:
+        plt.savefig(os.path.splitext(image)[0] + '_2DBB.jpg')
+    if visualize:
+        plt.show()
 
     return dic
 
@@ -54,4 +74,7 @@ def args(description):
 if __name__ == '__main__':
     args = args('2D Bounding Boxes Demo')
 
-    print(TwoDBB(args.gpu, args.pretrained_model, args.image, args.visualize, args.save))
+    if args.visualize or args.save:
+        print(TwoDBB_demo(args.gpu, args.pretrained_model, args.image, args.visualize, args.save))
+    else:
+        print(TwoDBB(args.gpu, args.pretrained_model, args.image))
