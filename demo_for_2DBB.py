@@ -31,12 +31,12 @@ def TwoDBB(gpu, pretrained_model, image, visualize, save):
     for i in range(n_objects):
         dic.append({'bbox': bbox_xy[i], 'class': label[i]})
 
-    vis_bbox(img, bbox, label, score, label_names=NYU40CLASSES)
-    if visualize:
-        plt.show()
-
-    if save:
-        plt.savefig(os.path.splitext(image)[0]+'_2DBB.jpg')
+    if save or visualize:
+        vis_bbox(img, bbox, label, score, label_names=NYU40CLASSES)
+        if save:
+            plt.savefig(os.path.splitext(image)[0] + '_2DBB.jpg')
+        if visualize:
+            plt.show()
 
     return dic
 
