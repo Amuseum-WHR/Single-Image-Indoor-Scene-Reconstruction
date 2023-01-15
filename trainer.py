@@ -10,9 +10,14 @@ from model.network import TOTAL3D
 from model.loss import ReconLoss, JointLoss, Detection_Loss, PoseLoss
 
 from configs.data_config import Config as Data_Config
-from configs.data_config import NYU37_TO_PIX3D_CLS_MAPPING
+from configs.data_config import NYU37_TO_PIX3D_CLS_MAPPING, NYU40CLASSES
 from model.utils.libs import get_rotation_matrix_gt, get_mask_status
 from model.utils.libs import to_dict_tensor
+from eval_metrics import *
+from model.utils.libs import write_obj
+from scipy.io import savemat
+from model.utils.libs import *
+import os
 
 
 def parser():
@@ -77,7 +82,7 @@ class Trainer():
         mgn_load_path = self.opt.mgn_load_path
         t3d_load_path = self.opt.t3d_load_path
         if t3d_load_path != '':
-            self.model.load_state_dict(torch.load(t3d_load_path))
+            self.model.load_state_dict(torch.load(t3d_load_path, map_location=self.device))
             print("Loading Total3D model " + t3d_load_path)
         else:
             if len_load_path != '':
@@ -121,6 +126,20 @@ class Trainer():
                 'odn loss': odn_loss['total'], 
                 'mgn loss': recon_loss['mesh_loss'], 
                 'joint loss': joint_loss['total_loss']}
+    
+    def eval(self, data):
+        len_input, odn_input, joint_input = self.to_device(data)
+        len_est_data, odn_est_data, mgn_est_data = self.model(len_input, odn_input, joint_input, train=False, eval=True)
+
+        joint_input = dict(dict(len_input, **odn_input), **joint_input)
+        # joint_est_data = dict(len_est_data.items() + odn_est_data.items() + mgn_est_data.items())
+        joint_est_data = dict(dict(len_est_data, **odn_est_data), **mgn_est_data)
+
+        len_loss, layout_results = self.poseloss(len_est_data, len_input, self.bins_tensor)
+        
+        joint_est_data['lo_bdb3D'] = layout_results['lo_bdb3D_result']
+        loss = self.get_metric_values(joint_est_data, joint_input)
+        return loss
 
 
     def to_device(self, data):
@@ -189,11 +208,107 @@ class Trainer():
         bdb2D_from_3D_gt = data['boxes_batch']['bdb2D_from_3D'].float().to(device)
         bdb2D_pos = data['boxes_batch']['bdb2D_pos'].float().to(device)
 
-        joint_input = {'bdb3D':bdb3D, 'K':K, 'depth_maps':depth_maps, 'cam_R_gt':cam_R_gt,
+        joint_input = {'bdb3D':bdb3D, 'K':K, 'depth_maps':depth_maps, 'cam_R_gt':cam_R_gt, 
                         'obj_masks':obj_masks, 'mask_status':mask_status, 'mask_flag':mask_flag, 'patch_for_mesh':patch_for_mesh,
                         'cls_codes_for_mesh':cls_codes_for_mesh, 'bdb2D_from_3D_gt':bdb2D_from_3D_gt, 'bdb2D_pos':bdb2D_pos}
 
         return layout_input, object_input, joint_input
+
+    def get_metric_values(self, est_data, gt_data):
+        ''' Performs a evaluation step.
+        '''
+
+        # Layout IoU
+        lo_bdb3D_out, _ = get_layout_bdb_sunrgbd(self.bins_tensor, est_data['lo_ori_reg'],
+                                              torch.argmax(est_data['lo_ori_cls'], 1), est_data['lo_centroid'],
+                                              est_data['lo_coeffs'])
+
+        layout_iou = []
+        for index in range(len(lo_bdb3D_out)):
+        # for index, sequence_id in enumerate(gt_data['sequence_id']):
+            lo_iou = get_iou_cuboid(lo_bdb3D_out[index, :, :].cpu().numpy(), gt_data['lo_bdb3D'][index, :, :].cpu().numpy())
+            layout_iou.append(lo_iou)
+
+        # camera orientation for evaluation
+        cam_R_out = get_rotation_matix_result(self.bins_tensor,
+                                              torch.argmax(est_data['pitch_cls'], 1), est_data['pitch_reg'],
+                                              torch.argmax(est_data['roll_cls'], 1), est_data['roll_reg'])
+
+        # projected center
+        P_result = torch.stack(((gt_data['bdb2D_pos'][:, 0] + gt_data['bdb2D_pos'][:, 2]) / 2 - (
+                gt_data['bdb2D_pos'][:, 2] - gt_data['bdb2D_pos'][:, 0]) * est_data['offset_2D'][:, 0],
+                                (gt_data['bdb2D_pos'][:, 1] + gt_data['bdb2D_pos'][:, 3]) / 2 - (
+                                        gt_data['bdb2D_pos'][:, 3] - gt_data['bdb2D_pos'][:, 1]) * est_data['offset_2D'][:, 1]), 1)
+
+        bdb3D_out_form_cpu, bdb3D_out = get_bdb_evaluation(self.bins_tensor, torch.argmax(est_data['ori_cls'], 1), est_data['ori_reg'],
+                                                       torch.argmax(est_data['centroid_cls'], 1), est_data['centroid_reg'],
+                                                       gt_data['size_cls'], est_data['size_reg'], P_result, gt_data['K'], cam_R_out, gt_data['split'], return_bdb=True)
+
+        bdb2D_out = get_bdb_2d_result(bdb3D_out, cam_R_out, gt_data['K'], gt_data['split'])
+
+        nyu40class_ids = []
+        IoU3D = []
+        IoU2D = []
+        class_list = [NYU40CLASSES[int(item['classid'])] for item in bdb3D_out_form_cpu]
+        for index, evaluate_bdb in enumerate(bdb3D_out_form_cpu):
+            
+            NYU40CLASS_ID = int(evaluate_bdb['classid'])
+            iou_3D = get_iou_cuboid(get_corners_of_bb3d_no_index(evaluate_bdb['basis'], evaluate_bdb['coeffs'],
+                                                                 evaluate_bdb['centroid']),
+                                    gt_data['bdb3D'][index, :, :].cpu().numpy())
+
+            box1 = bdb2D_out[index, :].cpu().numpy()
+            box2 = gt_data['bdb2D_from_3D_gt'][index, :].cpu().numpy()
+
+            box1 = {'u1': box1[0], 'v1': box1[1], 'u2': box1[2], 'v2': box1[3]}
+            box2 = {'u1': box2[0], 'v1': box2[1], 'u2': box2[2], 'v2': box2[3]}
+
+            iou_2D = get_iou(box1, box2)
+
+            nyu40class_ids.append(NYU40CLASS_ID)
+            IoU3D.append(iou_3D)
+            IoU2D.append(iou_2D)
+
+        # '''Save results'''
+        # if self.cfg.config['log']['save_results']:
+
+        #     save_path = self.cfg.config['log']['vis_path']
+
+        #     for index, sequence_id in enumerate(gt_data['sequence_id']):
+        #         save_path_per_img = os.path.join(save_path, str(sequence_id.item()))
+        #         if not os.path.exists(save_path_per_img):
+        #             os.mkdir(save_path_per_img)
+
+        #         # save layout results
+        #         savemat(os.path.join(save_path_per_img, 'layout.mat'),
+        #                 mdict={'layout': lo_bdb3D_out[index, :, :].cpu().numpy()})
+
+        #         # save bounding boxes and camera poses
+        #         interval = gt_data['split'][index].cpu().tolist()
+        #         current_cls = nyu40class_ids[interval[0]:interval[1]]
+
+        #         savemat(os.path.join(save_path_per_img, 'bdb_3d.mat'),
+        #                 mdict={'bdb': bdb3D_out_form_cpu[interval[0]:interval[1]], 'class_id': current_cls})
+        #         savemat(os.path.join(save_path_per_img, 'r_ex.mat'),
+        #                 mdict={'cam_R': cam_R_out[index, :, :].cpu().numpy()})
+
+        #         current_faces = est_data['out_faces'][interval[0]:interval[1]].cpu().numpy()
+        #         current_coordinates = est_data['meshes'].transpose(1,2)[interval[0]:interval[1]].cpu().numpy()
+
+        #         for obj_id, obj_cls in enumerate(current_cls):
+        #             file_path = os.path.join(save_path_per_img, '%s_%s.obj' % (obj_id, obj_cls))
+
+        #             mesh_obj = {'v': current_coordinates[obj_id],
+        #                         'f': current_faces[obj_id]}
+
+        #             write_obj(file_path, mesh_obj)
+
+        metrics = {}
+        metrics['layout_iou'] = np.mean(layout_iou)
+        metrics['iou_3d'] = IoU3D
+        metrics['iou_2d'] = IoU2D
+        metrics['class'] = class_list
+        return metrics
 
 
 

@@ -18,21 +18,23 @@ class TOTAL3D(nn.Module):
         self.mgn_threshold = opt.threshold
         self.mgn_factor = opt.factor 
 
-    def forward(self, len_input, odn_input, joint_input, train=True):
+    def forward(self, len_input, odn_input, joint_input, train=True, eval=False):
         l_est_data = self.len(len_input['image'])
         # print(len_input['image'])
         o_est_data = self.odn(odn_input['patch'], odn_input['g_features'], odn_input['split'], odn_input['rel_pair_counts'], odn_input['size_cls'])
-        # print(odn_input['patch'])
-        # print( odn_input['rel_pair_counts'], odn_input['size_cls'], )
-        output_mesh,_ ,_ ,_ ,_ ,faces  = self.mgn(joint_input["patch_for_mesh"], joint_input["cls_codes_for_mesh"], train=train, threshold=self.mgn_threshold, factor=self.mgn_factor)
-        if train == True:
-            output_mesh = output_mesh[-1]
-            output_mesh[:, 2, :] *= -1
-            m_est_data = {'meshes':output_mesh}
+        if eval==True:
+            m = dict()
+            return l_est_data, o_est_data, m 
         else:
-            # out_faces = faces -1
-            out_faces = faces
-            output_mesh = output_mesh[-1]
-            output_mesh[:, 2, :] *= -1
-            m_est_data = {'meshes':output_mesh, 'out_faces': out_faces}
-        return l_est_data, o_est_data, m_est_data
+            output_mesh,_ ,_ ,_ ,_ ,faces  = self.mgn(joint_input["patch_for_mesh"], joint_input["cls_codes_for_mesh"], train=train, threshold=self.mgn_threshold, factor=self.mgn_factor)
+            if train == True:
+                output_mesh = output_mesh[-1]
+                output_mesh[:, 2, :] *= -1
+                m_est_data = {'meshes':output_mesh}
+            else:
+                # out_faces = faces -1
+                out_faces = faces
+                output_mesh = output_mesh[-1]
+                output_mesh[:, 2, :] *= -1
+                m_est_data = {'meshes':output_mesh, 'out_faces': out_faces}
+            return l_est_data, o_est_data, m_est_data
