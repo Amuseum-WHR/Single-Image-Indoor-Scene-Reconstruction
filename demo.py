@@ -54,6 +54,7 @@ def parser():
     parser.add_argument("--cuda_num", type =int, default = 0, help = 'Which GPU to use for training.')
 
     parser.add_argument("--mode", type =str, default = 'normal', choices = ['normal', 'replace', 'add', 'exchange'], help = 'mode to run the code')
+    parser.add_argument("--read_data", type =str, default = '2d-detection', choices = ['dataset', '2d-detection', 'json'], help = 'mode to run the code')
     parser.add_argument("--src_class", type =str, default = 'table', help = 'the class we want to replace')
     parser.add_argument("--target_class", type =str, default = 'sofa', help = 'the class we want to replace with')
     parser.add_argument('--detection_path', type =str, default='../Total3D/detection-pretrain/sunrgbd_model_95000.npz')
@@ -128,9 +129,12 @@ if __name__ == "__main__":
     os.mkdir(save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    # gt_data = tester.read_from_img(K, save_path=save_path)
-    # gt_data = get_random_data_from_sunrgbd(save_path)
-    gt_data = tester.read_from_json(opt.img_path, opt.json_path, K, save_path)
+    if opt.read_data == '2d-detection':
+        gt_data = tester.read_from_img(K, save_path=save_path)
+    elif opt.read_data == 'json':
+        gt_data = tester.read_from_json(opt.img_path, opt.json_path, K, save_path)
+    else:
+        gt_data = get_random_data_from_sunrgbd(save_path)
     with torch.no_grad():
         est_data, data = tester.step(gt_data)
 

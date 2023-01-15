@@ -1,5 +1,6 @@
 from tester_pymesh import Tester
 
+import json
 import time
 import datetime
 import argparse
@@ -53,6 +54,7 @@ def parser():
     parser.add_argument("--cuda_num", type =int, default = 0, help = 'Which GPU to use for training.')
 
     parser.add_argument("--mode", type =str, default = 'normal', choices = ['normal', 'replace', 'add', 'exchange'], help = 'mode to run the code')
+    parser.add_argument("--read_data", type =str, default = 'dataset', choices = ['dataset', '2d-detection', 'json'], help = 'mode to run the code')
     parser.add_argument("--src_class", type =str, default = 'table', help = 'the class we want to replace')
     parser.add_argument("--target_class", type =str, default = 'sofa', help = 'the class we want to replace with')
     parser.add_argument('--detection_path', type =str, default='detection-pretrain/sunrgbd_model_95000.npz')
@@ -69,12 +71,22 @@ def parser():
     opt.date = str(datetime.datetime.now())
     return opt
 
-def get_random_data_from_sunrgbd():
+def get_random_data_from_sunrgbd(save_path = None):
     dataset = SunDataset(root_path='.', device= opt.device, mode='test')
-    Train_loader = DataLoader(dataset, batch_size= opt.batch_size, collate_fn=collate_fn, shuffle = False)
+    Train_loader = DataLoader(dataset, batch_size= opt.batch_size, collate_fn=collate_fn, shuffle = True)
     for idx, gt_data in enumerate(Train_loader):
         if idx == 0:
             break
+
+    if save_path is not None:
+        with open(os.path.join(save_path, 'detections.json'), 'w') as f:
+            n_objects = gt_data['boxes_batch']['bdb2D_pos'].shape[0]
+            size_cls = gt_data['boxes_batch']['size_cls'].tolist()
+            labels = [int(np.argmax(one_hot)) for one_hot in size_cls]
+            detections = []
+            for i in range(n_objects):
+                detections.append({'bbox': gt_data['boxes_batch']['bdb2D_pos'][i].tolist(), 'class': NYU40CLASSES[labels[i]]})
+            f.write(json.dumps(detections))
     return gt_data
 
 if __name__ == "__main__":
@@ -116,9 +128,15 @@ if __name__ == "__main__":
     os.mkdir(save_path)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    # gt_data = tester.read_from_img(K, save_path=save_path)
-    # gt_data = get_random_data_from_sunrgbd(save_path)
-    gt_data = tester.read_from_json(opt.img_path, opt.json_path, K, save_path)
+        
+    if opt.read_data == '2d-detection':
+        gt_data = tester.read_from_img(K, save_path=save_path)
+    elif opt.read_data == 'json':
+        gt_data = tester.read_from_json(opt.img_path, opt.json_path, K, save_path)
+    else:
+        gt_data = get_random_data_from_sunrgbd(save_path)
+    
+
     with torch.no_grad():
         est_data, data = tester.step(gt_data)
 
