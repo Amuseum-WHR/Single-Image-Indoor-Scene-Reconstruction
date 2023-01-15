@@ -30,10 +30,9 @@ class TOTAL3D(nn.Module):
             output_mesh[:, 2, :] *= -1
             m_est_data = {'meshes':output_mesh}
         else:
-            out_faces = faces -1
+            # out_faces = faces -1
+            out_faces = faces
             output_mesh = output_mesh[-1]
             output_mesh[:, 2, :] *= -1
             m_est_data = {'meshes':output_mesh, 'out_faces': out_faces}
-        # print(l_est_data)
-        print(o_est_data)
         return l_est_data, o_est_data, m_est_data

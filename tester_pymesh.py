@@ -1,6 +1,6 @@
 import datetime
 import argparse
-import os
+
 import math
 import torch
 import torch.nn as nn
@@ -93,58 +93,7 @@ class Tester():
             if_cuda = False
         self.bins_tensor = to_dict_tensor(dataset_config.bins, if_cuda=if_cuda)
         self.mode = opt.mode
-        # self.load_good()
         self.load_model()
-
-    def load_good(self):
-        path = 'out/pretrained_model.pth'
-        state_dict = torch.load(path, map_location=self.device)
-        odn_state = dict()
-        len_state = dict()
-        mgn_state = dict()
-        for item in state_dict:
-            for i in state_dict[item]:
-                if i[0:6] == 'layout':
-                    new_name = i[25:]
-                    len_state[new_name] = state_dict[item][i]
-                elif i[0:4] == 'mesh':
-                    new_name = i[27:]
-                    if new_name[0:8] == 'decoders' or new_name[0:5] == 'error':
-                        new_name = 'decoder.' + new_name
-                    mgn_state[new_name] = state_dict[item][i]
-                elif i[0:6] == 'object':
-                    new_name = i[17:]
-                    if new_name[0:6] == 'resnet':
-                        new_name = new_name[0:6] + new_name[13:]
-                    elif new_name[0:6] == 'relnet':
-                        if new_name[7:11] == 'fc_K':
-                            new_name = new_name[0:7] + 'K' + new_name[11:]
-                        if new_name[7:11] == 'fc_Q':
-                            new_name = new_name[0:7] + 'Q' + new_name[11:]
-                        if new_name[7:11] == 'fc_g':
-                            new_name = new_name[0:7] + 'G' + new_name[11:]
-                        if new_name[7:13] == 'conv_s':
-                            new_name = new_name[0:7] + 'scale_layer' + new_name[13:]
-                    elif new_name[0:11] == 'fc_centroid':
-                        new_name = 'fc4' + new_name[11:]
-                    elif new_name[0:3] == 'fc5':
-                        new_name = 'fc3' + new_name[3:]
-                    elif new_name[0:3] == 'fc3':
-                        new_name = 'fc7' + new_name[3:]
-                    elif new_name[0:3] == 'fc4':
-                        new_name = 'fc8' + new_name[3:]
-                    elif new_name[0:8] == 'fc_off_1':
-                        new_name = 'fc1' + new_name[8:]
-                    elif new_name[0:8] == 'fc_off_2':
-                        new_name = 'fc2' + new_name[8:]
-                    elif new_name[0:3] == 'fc1':
-                        new_name = 'fc5' + new_name[3:]
-                    elif new_name[0:3] == 'fc2':
-                        new_name = 'fc6' + new_name[3:]
-                    odn_state[new_name] = state_dict[item][i]
-        self.model.len.load_state_dict(len_state)
-        self.model.odn.load_state_dict(odn_state)
-        self.model.mgn.load_state_dict(mgn_state)
     
     def load_model(self):
         len_load_path = self.opt.len_load_path
@@ -171,7 +120,6 @@ class Tester():
         return
     
     def step(self, data):
-        
         if self.mode == 'replace':
             src_cls = class_to_code[self.opt.src_class]
             target_cls = class_to_code[self.opt.target_class]
@@ -214,7 +162,6 @@ class Tester():
         split = data['obj_split']
         rel_pair_count = torch.cat([torch.tensor([0]), torch.cumsum(
             torch.pow(data['obj_split'][:,1]- data['obj_split'][:,0],2),dim = 0)],dim = 0)
-
         object_input = {'patch': patch, 'g_features': g_features, 'size_cls': size_cls,
                         'split': split, 'rel_pair_counts': rel_pair_count}
 
@@ -234,7 +181,7 @@ class Tester():
                         'K':K}
 
         return layout_input, object_input, joint_input
-
+    
     def process_raw_data(self, data, add_img=None):
         camera = data['camera']
         camera['K'] = camera['K'].unsqueeze(0)
@@ -326,7 +273,7 @@ class Tester():
                                             torch.argmax(size_cls, dim=1)]] = 1
 
         bdb2D_pos = data['boxes_batch']['bdb2D_pos'].float().to(device)
-        
+
         joint_input = { 'patch_for_mesh':patch,
                         'cls_codes_for_mesh':cls_codes,
                         'bdb2D_pos':bdb2D_pos,
@@ -447,3 +394,59 @@ class Tester():
                 boxes[i]['bbox'][j] = float(boxes[i]['bbox'][j])
             boxes[i]['class'] = float(boxes[i]['class'])
         return raw_data
+    
+    def save_mesh(self, current_coordinates, current_faces, bdb3D_out_form_cpu, current_cls, file_path):
+        total_vertice = None
+        total_face = None
+        count = 0
+        current_faces -= 1
+        
+        for obj_id, obj_cls in enumerate(current_cls):
+            if obj_cls not in RECON_3D_CLS:
+                continue
+            points = current_coordinates[obj_id]
+            mesh_center = (points.max(0) + points.min(0)) / 2.
+
+            points = points - mesh_center
+
+            mesh_coef = (points.max(0) - points.min(0)) / 2.
+
+            # print(np.diag(1./mesh_coef))
+
+            points = np.dot(points, np.diag(1./mesh_coef))
+            points = np.dot(points, np.diag(bdb3D_out_form_cpu[obj_id]['coeffs']))
+
+            # set orientation
+            points = np.dot(points, bdb3D_out_form_cpu[obj_id]['basis'])
+
+            # move to center
+            points = points + bdb3D_out_form_cpu[obj_id]['centroid']
+
+            # file_path = os.path.join(save_path, '%s_%s_666.obj' % (obj_id, obj_cls))
+            # pymesh.save_mesh_raw(file_path, points, current_faces[obj_id])
+            # print(points.shape)
+            if count == 0:
+                total_vertice = points
+                total_face = current_faces[obj_id]
+                count += 1
+            else:
+                total_vertice = np.vstack((total_vertice, points))
+                faces = current_faces[obj_id]
+                faces = faces + count * 2562
+                total_face = np.vstack((total_face, faces))
+                count += 1
+        
+        # import open3d as o3d
+        # pcd = o3d.geometry.PointCloud()
+        # pcd.points = o3d.utility.Vector3dVector(total_vertice)
+        # o3d.io.write_point_cloud(file_path, pcd)
+        import pymesh
+        pymesh.save_mesh_raw(file_path, total_vertice, total_face)
+        print("mesh saving at {}".format(file_path))
+
+
+
+    
+    
+    
+    
