@@ -118,7 +118,7 @@ if __name__ == "__main__":
         os.makedirs(save_path)
     # gt_data = tester.read_from_img(K, save_path=save_path)
     # gt_data = get_random_data_from_sunrgbd(save_path)
-    gt_data = tester.read_from_json(opt.img_path, opt.json_path, K)
+    gt_data = tester.read_from_json(opt.img_path, opt.json_path, K, save_path)
     with torch.no_grad():
         est_data, data = tester.step(gt_data)
 
@@ -127,9 +127,6 @@ if __name__ == "__main__":
     # save results
     print("Saving...")
     nyu40class_ids = [int(evaluate_bdb['classid']) for evaluate_bdb in bdb3D_out_form_cpu]
-    save_path = opt.demo_path
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)
     
     # save bounding boxes and camera poses
     interval = data['split'][0].cpu().tolist()

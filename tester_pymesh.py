@@ -1,6 +1,7 @@
 import datetime
 import argparse
 
+import os
 import math
 import torch
 import torch.nn as nn
@@ -353,7 +354,7 @@ class Tester():
             gt_data = self.process_raw_data(raw_data, add_img)
         return gt_data
 
-    def read_from_json(self, image_path, json_path, K):
+    def read_from_json(self, image_path, json_path, K, save_path=None):
         if self.mode != 'add':
             raw_data = self.get_data_from_json(image_path, json_path, K)
             gt_data = self.process_raw_data(raw_data)
@@ -371,11 +372,11 @@ class Tester():
             add_img = add_img.crop((add_box[idx]['bbox'][0], add_box[idx]['bbox'][1], add_box[idx]['bbox'][2], add_box[idx]['bbox'][3]))
             add_box = add_box[idx:idx+1]
             add_box[0]['bbox'] = self.opt.add_box
-            raw_data = self.get_data_from_json(image_path, json_path, K, add_box)
+            raw_data = self.get_data_from_json(image_path, json_path, K, add_box, save_path)
             gt_data = self.process_raw_data(raw_data, add_img)
         return gt_data
 
-    def get_data_from_json(self, image_path, json_path, K, add_box=None):
+    def get_data_from_json(self, image_path, json_path, K, add_box=None, save_path=None):
         raw_data = dict()
         raw_data['camera'] = {'K': K}
         raw_data['image'] = Image.open(image_path, mode='r')
@@ -393,6 +394,8 @@ class Tester():
             for j in range(len(boxes[i]['bbox'])):
                 boxes[i]['bbox'][j] = float(boxes[i]['bbox'][j])
             boxes[i]['class'] = float(boxes[i]['class'])
+        with open(os.path.join(save_path, 'box.json'), 'w') as f:
+            f.write(json.dumps(boxes))
         return raw_data
     
     def save_mesh(self, current_coordinates, current_faces, bdb3D_out_form_cpu, current_cls, file_path):
