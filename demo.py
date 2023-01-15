@@ -40,7 +40,7 @@ def parser():
     parser.add_argument("--mgn_load_path", type = str, default = "", help = 'path of saved mgn model')
     parser.add_argument("--len_load_path", type = str, default = "") # "out/len_pretrain_model.pth", help = 'path of saved odn model')
     parser.add_argument("--odn_load_path", type = str, default = "") # "out/odn_pretrain_model.pth", help = 'path of saved len model')
-    parser.add_argument("--t3d_load_path", type = str, default = "../Total3D/out/t3d_checkpoints_epoch66.pth") # "out/t3d_checkpoints_epoch66.pth"), help = 'path of saved t3d model')
+    parser.add_argument("--t3d_load_path", type = str, default = "out/t3d_checkpoints_epoch66.pth") # "out/t3d_checkpoints_epoch66.pth"), help = 'path of saved t3d model')
     parser.add_argument("--model_path", type=str, default="out", help='dir to save checkpoints')
 
     parser.add_argument("--log_path", type = str, default = "log", help = 'path of log info')
@@ -57,7 +57,7 @@ def parser():
     parser.add_argument("--read_data", type =str, default = '2d-detection', choices = ['dataset', '2d-detection', 'json'], help = 'mode to run the code')
     parser.add_argument("--src_class", type =str, default = 'table', help = 'the class we want to replace')
     parser.add_argument("--target_class", type =str, default = 'sofa', help = 'the class we want to replace with')
-    parser.add_argument('--detection_path', type =str, default='../Total3D/detection-pretrain/sunrgbd_model_95000.npz')
+    parser.add_argument('--detection_path', type =str, default='out/2DBB/2dbb_model_80000.npz')
     parser.add_argument('--img_path', type =str, default='demo/3/img.jpg')
     parser.add_argument('--json_path', type =str, default='demo/3/detections.json')
     parser.add_argument('--add_img', type =str, default='demo/1/img.jpg')
@@ -108,18 +108,12 @@ if __name__ == "__main__":
                                 [0.,     0.,     1. ]]
                                 )
     elif opt.k == 'ours':
-        # K = torch.FloatTensor([[2961, 0, 1079], 
-        #                         [0, 2962, 1933], 
+        K = torch.FloatTensor([[3346.90380668512, 0, 2035.77624651872],
+                                [0, 3352.41685350737, 1553.89162781762],
+                                [0, 0, 1]])
+        # K = torch.FloatTensor([[3500, 0, 2048],
+        #                         [0, 3500, 1536],
         #                         [0, 0, 1]])
-        # K = torch.FloatTensor([[3453.80723446789, 0, 1509.77575786894], 
-        #                         [0, 3450.11438003616, 2042.44171449600], 
-        #                         [0, 0, 1]])
-        # K = torch.FloatTensor([[3346.90380668512, 0, 2035.77624651872], 
-        #                         [0, 3352.41685350737, 1553.89162781762], 
-        #                         [0, 0, 1]])
-        K = torch.FloatTensor([[ 1.42278701e+03, -4.60370724e-01,  6.62377447e+02],
-                                [ 0.00000000e+00,  1.42106838e+03,  3.03415123e+02],
-                                [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
     else:
         txt_path = opt.k_path
         K = torch.FloatTensor(np.loadtxt(txt_path))
