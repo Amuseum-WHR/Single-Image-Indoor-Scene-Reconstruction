@@ -177,6 +177,9 @@ class Tester():
             target_cls = class_to_code[self.opt.target_class]
             return self.replace_step(data, src_cls, target_cls)
         else:
+            if self.mode == 'exchange':
+                self.ch1 = self.opt.src_class
+                self.ch2 = self.opt.target_class
             return self.normal_step(data)
     
     def replace_step(self, data, src_cls, target_cls):
@@ -361,6 +364,21 @@ class Tester():
                                                         est_data['centroid_reg'],
                                                         data['size_cls'], est_data['size_reg'], P_result,
                                                         data['K'], cam_R_out, data['split'], return_bdb=True)
+
+        if self.mode == 'exchange':
+            class_list = [NYU40CLASSES[int(item['classid'])] for item in bdb3D_out_form_cpu]
+            idx1 = class_list.index(self.ch1) if self.ch1 in class_list else -1
+            idx2 = class_list.index(self.ch2) if self.ch2 in class_list else -1
+            if idx1 == -1:
+                print('can not find {} in the image'.format(self.ch1))
+            elif idx2 == -1:
+                print('can not find {} in the image'.format(self.ch2))
+            else:
+                tmp = bdb3D_out_form_cpu[idx1]['centroid']
+                bdb3D_out_form_cpu[idx1]['centroid'] = bdb3D_out_form_cpu[idx2]['centroid']
+                bdb3D_out_form_cpu[idx2]['centroid'] = tmp
+                print('exchange the position of {} and {} in the image'.format(self.ch1, self.ch2))
+
         return lo_bdb3D_out, cam_R_out, bdb3D_out_form_cpu, bdb3D_out
     
     def get_data_from_image(self, gpu, image_path, model_path, K, add_box=None, save_path=None):

@@ -53,7 +53,7 @@ def parser():
     parser.add_argument("--cuda", type =str, default = "cuda:0", help = 'Which GPU to use for training.')
     parser.add_argument("--cuda_num", type =int, default = 0, help = 'Which GPU to use for training.')
 
-    parser.add_argument("--mode", type =str, default = 'normal', choices = ['normal', 'replace', 'add'], help = 'mode to run the code')
+    parser.add_argument("--mode", type =str, default = 'normal', choices = ['normal', 'replace', 'add', 'exchange'], help = 'mode to run the code')
     parser.add_argument("--src_class", type =str, default = 'table', help = 'the class we want to replace')
     parser.add_argument("--target_class", type =str, default = 'sofa', help = 'the class we want to replace with')
     parser.add_argument('--detection_path', type =str, default='../Total3D/detection-pretrain/sunrgbd_model_95000.npz')
