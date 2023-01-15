@@ -356,7 +356,7 @@ class Tester():
 
     def read_from_json(self, image_path, json_path, K, save_path=None):
         if self.mode != 'add':
-            raw_data = self.get_data_from_json(image_path, json_path, K)
+            raw_data = self.get_data_from_json(image_path, json_path, K, save_path = save_path)
             gt_data = self.process_raw_data(raw_data)
         else:
             add_box = TwoDBB(self.opt.cuda_num, self.opt.detection_path, self.opt.add_img)
@@ -387,6 +387,8 @@ class Tester():
             raw_data['boxes'][i]['class'] = class_to_code[raw_data['boxes'][i]['class']]
 
         if add_box != None:
+            print(type(raw_data['boxes']))
+            print(add_box)
             raw_data['boxes'] = raw_data['boxes'] + add_box
 
         boxes = raw_data['boxes']
